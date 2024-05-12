@@ -4,7 +4,7 @@ from cryptography.hazmat._oid import NameOID
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate, load_pem_x509_crl
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from datetime import datetime, timedelta
 
@@ -119,7 +119,9 @@ class autoridade_certificacao:
                             user_id = informacoes.value
                         elif informacoes.oid == x509.NameOID.EMAIL_ADDRESS:
                             email = informacoes.value
-        self.emitir_certificado(nome, validade, user_id, email)
+                        elif informacoes.oid == x509.NameOID.ORGANIZATIONAL_UNIT_NAME:
+                            departamento = informacoes.value
+        self.emitir_certificado(nome, validade, user_id, email, departamento)
 
     def emitir_certificado(self, nome_cert, validade_dias, user_id, email, departamento):
         private_key = self.gerar_private_key()
@@ -134,7 +136,8 @@ class autoridade_certificacao:
 
     # Foi usado curvas elipticas
     def gerar_private_key(self):
-        return ec.generate_private_key(ec.BrainpoolP512R1(), default_backend())
+        private_key = rsa.generate_private_key(public_exponent=65537,key_size=4096,backend=default_backend())
+        return private_key
 
     def gerar_requisicao_certificado(self, ca_key, nome, user_id, email, departamento):
         sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, nome),
@@ -196,7 +199,7 @@ class autoridade_certificacao:
                             nome_emissor = info_emissor.value
                             break
                     print("Emissor: ", nome_emissor)
-                    print("Validade - De:", cert.not_valid_before_utc, ", Até:", cert.not_valid_after_utc)
+                    print("Validade - De:", cert.not_valid_before, ", Até:", cert.not_valid_after)
                     print("Local:", cert.issuer.get_attributes_for_oid(NameOID.COUNTRY_NAME)[0].value)
                     self.verificar_revocacao(formatted_serial)
                     return cert
