@@ -1,0 +1,30 @@
+services:
+  root:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - level=root
+    networks:
+      - internal
+  
+  services:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - level=services
+    networks:
+      - internal
+  
+  users:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - level=users
+    networks:
+      - internal
+networks:
+  internal:
+    driver: bridge
