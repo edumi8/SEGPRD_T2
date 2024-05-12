@@ -4,7 +4,7 @@ from cryptography.hazmat._oid import NameOID
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate, load_pem_x509_crl
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.hazmat.primitives import hashes
 from datetime import datetime, timedelta
 
@@ -136,7 +136,8 @@ class autoridade_certificacao:
 
     # Foi usado curvas elipticas
     def gerar_private_key(self):
-        return ec.generate_private_key(ec.BrainpoolP512R1(), default_backend())
+        private_key = rsa.generate_private_key(public_exponent=65537,key_size=4096,backend=default_backend())
+        return private_key
 
     def gerar_requisicao_certificado(self, ca_key, nome, user_id, email, departamento):
         sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, nome),
