@@ -126,11 +126,11 @@ class autoridade_certificacao:
     def emitir_certificado(self, nome_cert, validade_dias, user_id, email, departamento):
         private_key = self.gerar_private_key()
         print("Chave privada gerada:")
-        chave_privada_certificado = private_key.private_bytes(encoding=serialization.Encoding.PEM,
+        self.chave_privada_certificado = private_key.private_bytes(encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()).decode()
         #A saida da chave privada pode ser uma arquivo txt
-        print(chave_privada_certificado)
+        # print(chave_privada_certificado)
         solicitacao_certificado, builder = self.gerar_requisicao_certificado(private_key, nome_cert, user_id, email, departamento)
         return self.assinar_certificado(solicitacao_certificado, validade_dias)
 

@@ -1,0 +1,22 @@
+FROM python
+
+WORKDIR /usr/src/app
+
+# Copying requirements and installing dependencies
+RUN pwd
+COPY . .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copying the rest of the application
+COPY . .
+
+# Setting the default value of the level argument
+ARG level=root
+
+# Set environment variable for the entrypoint script
+ENV ENVIRONMENT=$level
+
+# Print the environment variable to ensure it's set
+RUN echo "Environment is: $ENVIRONMENT"
+
+ENTRYPOINT [ "./entrypoint_root.sh" ]
