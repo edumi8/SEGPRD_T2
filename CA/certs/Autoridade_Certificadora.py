@@ -19,6 +19,17 @@ class autoridade_certificacao:
         self.crl_file = crl_file
         self.diretorio_certificados_emitidos = diretorio_certificados_emitidos
         self.crl = self.carrega_crl()
+
+    def criar_crl(self, ficheiro_destino):
+        crl_file = (x509.CertificateRevocationListBuilder().issuer_name(self.ca_cert.subject).
+                    last_update(datetime.utcnow()).next_update(datetime.utcnow() + timedelta(days=30)))
+        crl_file = crl_file.sign(self.ca_key, hashes.SHA512(), default_backend())
+        if not os.path.exists(ficheiro_destino):
+            os.makedirs(ficheiro_destino)
+        crl_caminho = os.path.join(ficheiro_destino, "crl.pem")
+        with open(crl_caminho, "wb") as crl_arquivo:
+            crl_arquivo.write(crl_file.public_bytes(serialization.Encoding.PEM))
+
     # Carrega a CRL
     def carrega_crl(self):
         with open(self.crl_file, "rb") as f:
@@ -93,6 +104,21 @@ class autoridade_certificacao:
             if revoked_cert.serial_number == numero_serial_int:
                 return True, print("O certificado está revogado.")
         return False
+
+    def recuperar_certificado_revogado(self, serial_number, validade):
+        for filename in os.listdir(self.diretorio_certificados_emitidos):
+            with open(os.path.join(self.diretorio_certificados_emitidos, filename), "rb") as f:
+                cert = load_pem_x509_certificate(f.read(), default_backend())
+                formatted_serial = ":".join("{:02x}".format(byte) for byte in cert.serial_number.to_bytes(20, 'big'))
+                if formatted_serial == serial_number:
+                    for informacoes in cert.subject:
+                        if informacoes.oid == x509.NameOID.COMMON_NAME:
+                            nome = informacoes.value
+                        elif informacoes.oid == x509.NameOID.USER_ID:
+                            user_id = informacoes.value
+                        elif informacoes.oid == x509.NameOID.EMAIL_ADDRESS:
+                            email = informacoes.value
+        self.emitir_certificado(nome, validade, user_id, email)
 
     def emitir_certificado(self, nome_cert, validade_dias, user_id, email):
         private_key = self.gerar_private_key()
