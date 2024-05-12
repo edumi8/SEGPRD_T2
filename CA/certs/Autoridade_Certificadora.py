@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives import hashes
 from datetime import datetime, timedelta
 
 
+
 class autoridade_certificacao:
     # Carrega a chave, certificado e crl da CA, alem do diretorio para os certificados emitidos
     def __init__(self, ca_chave, ca_cert, crl_file, diretorio_certificados_emitidos):
@@ -96,18 +97,20 @@ class autoridade_certificacao:
 
     def emitir_certificado(self, nome_cert, validade_dias, user_id, email):
         private_key = self.gerar_private_key()
-        print("Chave privada gerada:")
-        chave_privada_certificado = private_key.private_bytes(encoding=serialization.Encoding.PEM,
+        #print("Chave privada gerada:")
+        self.chave_privada_certificado = private_key.private_bytes(encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()).decode()
         #A saida da chave privada pode ser uma arquivo txt
-        print(chave_privada_certificado)
+        #print(self.chave_privada_certificado)
         solicitacao_certificado, builder = self.gerar_requisicao_certificado(private_key, nome_cert, user_id, email)
         return self.assinar_certificado(solicitacao_certificado, validade_dias)
 
     # Foi usado curvas elipticas
     def gerar_private_key(self):
-        return ec.generate_private_key(ec.BrainpoolP512R1(), default_backend())
+        print("sdfhskjfhdj ")
+        p_key = ec.generate_private_key(ec.BrainpoolP512R1(), default_backend())
+        return p_key
 
     def gerar_requisicao_certificado(self, private_key, common_name, user_id, email):
         sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name),
@@ -142,7 +145,7 @@ class autoridade_certificacao:
                 if formatted_serial == serial_number:
                     chave_public = cert.public_key().public_bytes(encoding=serialization.Encoding.PEM, format=serialization
                                                                   .PublicFormat.SubjectPublicKeyInfo)
-        return print(chave_public.decode())
+        return chave_public.decode()
 
     # Busca certificado pelo número de série
     def encontrar_certificado_serial(self, serial_number):
