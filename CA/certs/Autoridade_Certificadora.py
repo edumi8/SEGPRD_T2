@@ -20,6 +20,17 @@ class autoridade_certificacao:
         self.crl_file = crl_file
         self.diretorio_certificados_emitidos = diretorio_certificados_emitidos
         self.crl = self.carrega_crl()
+
+    def criar_crl(self, ficheiro_destino):
+        crl_file = (x509.CertificateRevocationListBuilder().issuer_name(self.ca_cert.subject).
+                    last_update(datetime.utcnow()).next_update(datetime.utcnow() + timedelta(days=30)))
+        crl_file = crl_file.sign(self.ca_key, hashes.SHA512(), default_backend())
+        if not os.path.exists(ficheiro_destino):
+            os.makedirs(ficheiro_destino)
+        crl_caminho = os.path.join(ficheiro_destino, "crl.pem")
+        with open(crl_caminho, "wb") as crl_arquivo:
+            crl_arquivo.write(crl_file.public_bytes(serialization.Encoding.PEM))
+
     # Carrega a CRL
     def carrega_crl(self):
         with open(self.crl_file, "rb") as f:
@@ -39,10 +50,11 @@ class autoridade_certificacao:
                 with open(caminho_arquivo, "rb") as f:
                     certificado_bytes = f.read()
                     certificado = x509.load_pem_x509_certificate(certificado_bytes, default_backend())
-                serial_int = certificado.serial_number
-                data_validade = certificado.not_valid_after_utc.strftime("%d/%m/%Y")
+                data_validade = certificado.not_valid_after.strftime("%d/%m/%Y")
                 nome = certificado.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
-                certificado_info = f"Sujeito: {nome}, Data de Validade: {data_validade}, Serial: {serial_int}\n"
+                serial = certificado.serial_number.to_bytes((certificado.serial_number.bit_length() + 7) // 8,
+                                                            'big').hex(':')
+                certificado_info = f"Sujeito: {nome}, Data de Validade: {data_validade}, Serial: {serial}\n"
                 certificados_info.append(certificado_info)
         #certificados_info = sorted(certificados_info,key=lambda x: datetime.strptime(x.split(", Data de Validade: ")[1].split(",")[0],
         return "".join(certificados_info)
@@ -57,7 +69,7 @@ class autoridade_certificacao:
                 with open(caminho_arquivo, "rb") as file:
                     certificado = x509.load_pem_x509_certificate(file.read(), default_backend())
                 # ver validade
-                data_validade = certificado.not_valid_after_utc.date()
+                data_validade = certificado.not_valid_after.date()
                 # Os vencidos e que vencem na data da verificacao
                 if data_validade <= hoje:
                     # transforma em hexa:
@@ -95,15 +107,30 @@ class autoridade_certificacao:
                 return True, print("O certificado está revogado.")
         return False
 
-    def emitir_certificado(self, nome_cert, validade_dias, user_id, email):
+    def recuperar_certificado_revogado(self, serial_number, validade):
+        for filename in os.listdir(self.diretorio_certificados_emitidos):
+            with open(os.path.join(self.diretorio_certificados_emitidos, filename), "rb") as f:
+                cert = load_pem_x509_certificate(f.read(), default_backend())
+                formatted_serial = ":".join("{:02x}".format(byte) for byte in cert.serial_number.to_bytes(20, 'big'))
+                if formatted_serial == serial_number:
+                    for informacoes in cert.subject:
+                        if informacoes.oid == x509.NameOID.COMMON_NAME:
+                            nome = informacoes.value
+                        elif informacoes.oid == x509.NameOID.USER_ID:
+                            user_id = informacoes.value
+                        elif informacoes.oid == x509.NameOID.EMAIL_ADDRESS:
+                            email = informacoes.value
+        self.emitir_certificado(nome, validade, user_id, email)
+
+    def emitir_certificado(self, nome_cert, validade_dias, user_id, email, departamento):
         private_key = self.gerar_private_key()
         #print("Chave privada gerada:")
         self.chave_privada_certificado = private_key.private_bytes(encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()).decode()
         #A saida da chave privada pode ser uma arquivo txt
-        #print(self.chave_privada_certificado)
-        solicitacao_certificado, builder = self.gerar_requisicao_certificado(private_key, nome_cert, user_id, email)
+        print(chave_privada_certificado)
+        solicitacao_certificado, builder = self.gerar_requisicao_certificado(private_key, nome_cert, user_id, email, departamento)
         return self.assinar_certificado(solicitacao_certificado, validade_dias)
 
     # Foi usado curvas elipticas
@@ -112,11 +139,12 @@ class autoridade_certificacao:
         p_key = ec.generate_private_key(ec.BrainpoolP512R1(), default_backend())
         return p_key
 
-    def gerar_requisicao_certificado(self, private_key, common_name, user_id, email):
-        sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name),
-        x509.NameAttribute(NameOID.USER_ID, user_id), x509.NameAttribute(NameOID.EMAIL_ADDRESS, email)])
+    def gerar_requisicao_certificado(self, ca_key, nome, user_id, email, departamento):
+        sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, nome),
+                                         x509.NameAttribute(NameOID.USER_ID, user_id), x509.NameAttribute(NameOID.EMAIL_ADDRESS, email),
+                                         x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, departamento)])
         builder = x509.CertificateSigningRequestBuilder().subject_name(sujeito_certificado)
-        return builder.sign(private_key, hashes.SHA512(), default_backend()), builder
+        return builder.sign(ca_key, hashes.SHA512(), default_backend()), builder
 
     def assinar_certificado(self, solicitacao_certificado, validade_dias):
         emissor = self.ca_cert.subject
