@@ -134,7 +134,7 @@ class autoridade_certificacao:
         solicitacao_certificado, builder = self.gerar_requisicao_certificado(private_key, nome_cert, user_id, email, departamento)
         return self.assinar_certificado(solicitacao_certificado, validade_dias)
 
-    # Foi usado rsa
+    # Foi usado rsa _
     def gerar_private_key(self):
         private_key = rsa.generate_private_key(public_exponent=65537,key_size=4096,backend=default_backend())
         return private_key
