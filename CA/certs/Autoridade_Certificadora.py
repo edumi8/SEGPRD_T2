@@ -49,10 +49,11 @@ class autoridade_certificacao:
                 with open(caminho_arquivo, "rb") as f:
                     certificado_bytes = f.read()
                     certificado = x509.load_pem_x509_certificate(certificado_bytes, default_backend())
-                serial_int = certificado.serial_number
-                data_validade = certificado.not_valid_after_utc.strftime("%d/%m/%Y")
+                data_validade = certificado.not_valid_after.strftime("%d/%m/%Y")
                 nome = certificado.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
-                certificado_info = f"Sujeito: {nome}, Data de Validade: {data_validade}, Serial: {serial_int}\n"
+                serial = certificado.serial_number.to_bytes((certificado.serial_number.bit_length() + 7) // 8,
+                                                            'big').hex(':')
+                certificado_info = f"Sujeito: {nome}, Data de Validade: {data_validade}, Serial: {serial}\n"
                 certificados_info.append(certificado_info)
         #certificados_info = sorted(certificados_info,key=lambda x: datetime.strptime(x.split(", Data de Validade: ")[1].split(",")[0],
         return "".join(certificados_info)
@@ -67,7 +68,7 @@ class autoridade_certificacao:
                 with open(caminho_arquivo, "rb") as file:
                     certificado = x509.load_pem_x509_certificate(file.read(), default_backend())
                 # ver validade
-                data_validade = certificado.not_valid_after_utc.date()
+                data_validade = certificado.not_valid_after.date()
                 # Os vencidos e que vencem na data da verificacao
                 if data_validade <= hoje:
                     # transforma em hexa:
@@ -135,12 +136,12 @@ class autoridade_certificacao:
     def gerar_private_key(self):
         return ec.generate_private_key(ec.BrainpoolP512R1(), default_backend())
 
-    def gerar_requisicao_certificado(self, private_key, common_name, user_id, email, departamento):
-        sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+    def gerar_requisicao_certificado(self, ca_key, nome, user_id, email, departamento):
+        sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, nome),
                                          x509.NameAttribute(NameOID.USER_ID, user_id), x509.NameAttribute(NameOID.EMAIL_ADDRESS, email),
                                          x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, departamento)])
         builder = x509.CertificateSigningRequestBuilder().subject_name(sujeito_certificado)
-        return builder.sign(private_key, hashes.SHA512(), default_backend()), builder
+        return builder.sign(ca_key, hashes.SHA512(), default_backend()), builder
 
     def assinar_certificado(self, solicitacao_certificado, validade_dias):
         emissor = self.ca_cert.subject
