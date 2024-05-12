@@ -120,7 +120,7 @@ class autoridade_certificacao:
                             email = informacoes.value
         self.emitir_certificado(nome, validade, user_id, email)
 
-    def emitir_certificado(self, nome_cert, validade_dias, user_id, email):
+    def emitir_certificado(self, nome_cert, validade_dias, user_id, email, departamento):
         private_key = self.gerar_private_key()
         print("Chave privada gerada:")
         chave_privada_certificado = private_key.private_bytes(encoding=serialization.Encoding.PEM,
@@ -128,16 +128,17 @@ class autoridade_certificacao:
             encryption_algorithm=serialization.NoEncryption()).decode()
         #A saida da chave privada pode ser uma arquivo txt
         print(chave_privada_certificado)
-        solicitacao_certificado, builder = self.gerar_requisicao_certificado(private_key, nome_cert, user_id, email)
+        solicitacao_certificado, builder = self.gerar_requisicao_certificado(private_key, nome_cert, user_id, email, departamento)
         return self.assinar_certificado(solicitacao_certificado, validade_dias)
 
     # Foi usado curvas elipticas
     def gerar_private_key(self):
         return ec.generate_private_key(ec.BrainpoolP512R1(), default_backend())
 
-    def gerar_requisicao_certificado(self, private_key, common_name, user_id, email):
+    def gerar_requisicao_certificado(self, private_key, common_name, user_id, email, departamento):
         sujeito_certificado = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name),
-        x509.NameAttribute(NameOID.USER_ID, user_id), x509.NameAttribute(NameOID.EMAIL_ADDRESS, email)])
+                                         x509.NameAttribute(NameOID.USER_ID, user_id), x509.NameAttribute(NameOID.EMAIL_ADDRESS, email),
+                                         x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, departamento)])
         builder = x509.CertificateSigningRequestBuilder().subject_name(sujeito_certificado)
         return builder.sign(private_key, hashes.SHA512(), default_backend()), builder
 
